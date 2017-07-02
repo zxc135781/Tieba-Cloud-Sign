@@ -32,7 +32,7 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 	$set2['name'] = 'signset';
 	$set2['url'] = 'setting.php?mod=admin:set&type=sign';
 	$set2['method'] = '1';
-	
+
 	$content2['cron_limit'] = array('td1'=>'<b>单表单次签到执行数量</b><br/>0为一次性全部签到。此功能非常重要，设置为0会导致每次都扫描贴吧表，效率极低，请按需修改','type'=>'number','text'=>'注意这是控制单个表的，当你有N个表时，单次签到数量为 N × 分表数','extra'=>'min="0" step="1"');
 	$content2['bduss_num'] = array('td1'=>'<b>最大允许用户绑定账号数</b><br/>0为无限，-1为禁止绑定，对管理员无效','type'=>'number','text'=>'','extra'=>'min="-1" step="1"');
 	$content2['tb_max'] = array('td1'=>'<b>最大关注贴吧数量</b><br/>0为不限,对管理员无效','type'=>'number','text'=>'','extra'=>'min="0" step="1"');
@@ -55,8 +55,8 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 	        </td>
 	    </tr>';
 	$content2['sign_mode'] = array('html'=>$smhtml,'type'=>'else');
-	$content2['sign_scan'] = array('td1'=>'<b>贴吧数据表搜寻方法</b><br/><br/><input type="button" class="btn btn-default" onclick="viewSignScanModeHelp();" value="查看帮助">','type'=>'select','text'=>'<br/>该设置影响签到效率，不当的设置可能会导致效率降低并漏签');     
-	$content2['sign_scan']['select'] = array('0'=>'永不随机，按顺序抽取','1'=>'随机，使用 JOIN','2'=>'随机，使用 ORDER BY RAND()');   
+	$content2['sign_scan'] = array('td1'=>'<b>贴吧数据表搜寻方法</b><br/><br/><input type="button" class="btn btn-default" onclick="viewSignScanModeHelp();" value="查看帮助">','type'=>'select','text'=>'<br/>该设置影响签到效率，不当的设置可能会导致效率降低并漏签');
+	$content2['sign_scan']['select'] = array('0'=>'永不随机，按顺序抽取','1'=>'随机，使用 JOIN','2'=>'随机，使用 ORDER BY RAND()');
 	$ft1 = option::get('fb');
 	if (!empty($i['tabpart'])) {
 		$temp = '';
@@ -107,16 +107,18 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 		</td></tr>';
 	$content1['ann'] = array('html'=>$annhtml,'type'=>'else');
 	$content1['sign_multith'] = array('td1'=>'<b>计划任务线程数</b><br/>0单线程，此为模拟多线程','type'=>'number','text'=>'','extra'=>'min="0" step="1"');
-	$content1['cron_asyn'] = array('td1'=>'<b>计划任务同时运行</b><br/>主机需支持fsockopen','type'=>'checkbox','text'=>'当 do.php 被运行时，所有计划任务同时运行，有效提高计划任务效率，在高配机器上会加速任务，低配机器上可能会导致减速','extra'=>'');
-	$content1['cron_pw'] = array('td1'=>'<b>计划任务密码</b><br/>留空为无密码，不能包含空格等特殊字符','type'=>'text','text'=>'启用后需要通过访问 <b>do.php?pw=密码</b> 才能执行计划任务，POST/GET 均可','extra'=>'');
+	if(!function_exists('fsockopen')){
+		$content1['cron_asyn'] = array('td1'=>'<b>计划任务同时运行</b><br/>在高配机器上会加速任务，低配机器上可能会导致减速','type'=>'checkbox','text'=>'当 do.php 被运行时，所有计划任务同时运行，有效提高计划任务效率','extra'=>'');
+	} else {
+		$content1['cron_asyn'] = array('html'=>'<input type="number" name="cron_asyn" value="0" hidden>','type'=>'else');
+	}
+	$content1['cron_pw'] = array('td1'=>'<b>计划任务密码</b><br/>留空为无密码，不能包含空格等特殊字符<br/><a href="javascript:;" onclick="alert(\'你需要通过访问 <b>do.php?pw=密码</b> 执行计划任务<br/>例如：'.SYSTEM_URL.'do.php?pw=yourpassword<br/><br/>若您要通过命令行执行计划任务，请加上参数 <b>--pw=密码</b><br/>例如：php do.php --pw=yourpassword<br/>命令行模式注意：你需要指明do.php的绝对路径，或者将do.php加入PATH\')">帮助：启用密码功能后如何执行计划任务？</a>','type'=>'text','text'=>'','extra'=>'');
 	$reg1 = option::get('enable_reg') == 1 ? ' checked' : '' ;
-	$reg2 = option::get('protect_reg') == 1 ? ' checked' : '' ;
 	$reg3 = option::get('yr_reg');
 	$reg4 = option::get('stop_reg');
 	$reghtml = '<tr><td><b>注册相关设置</b><br/><br/>邀请码框留空表示无需邀请码<br/><br/>停止注册提示框输入指定提示内容</td><td>
 		<div class="input-group">
-			&nbsp;&nbsp;<input type="checkbox" name="enable_reg" value="1"'.$reg1.'> 允许用户注册&nbsp;&nbsp;&nbsp;&nbsp;
-			<input type="checkbox" name="protect_reg" value="1"'.$reg2.'> 反恶意注册
+		<input type="checkbox" name="enable_reg" value="1"'.$reg1.'> 允许用户注册
 		</div><br/>
 		<div class="input-group">
 			<span class="input-group-addon">邀请码设置</span><input type="text" name="yr_reg" id="yr_reg" value="'.$reg3.'" class="form-control">
@@ -126,10 +128,22 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 		</div>
 		</td></tr>';
 	$content1['reg'] = array('html'=>$reghtml,'type'=>'else');
+	if(function_exists('imagecreatetruecolor')){
+		$captchahtml = '<tr><td><b>注册/登录验证码</b><br/>可防止恶意用户爆破数据库，提升安全性<br/>点选难度可以查看示例。<br>';
+        $captchahtml .= '<img alt="验证码" id="captcha" class="img-thumbnail" style="cursor:pointer;display:none;" alt="示例验证码加载失败">';
+        $captchahtml .='</td><td>
+        <label><input type="radio" name="captcha" value="0" '.(option::get('captcha') == 0 ? ' checked' : '').'> 关闭</label><br>
+        <label><input type="radio" name="captcha" value="1" '.(option::get('captcha') == 1 ? ' checked' : '').'> 简单</label> (容易被破解)<br>
+        <label><input type="radio" name="captcha" value="2" '.(option::get('captcha') == 2 ? ' checked' : '').'> 中等</label> (可能被破解)<br>
+        <label><input type="radio" name="captcha" value="3" '.(option::get('captcha') == 3 ? ' checked' : '').'> 困难</label> (推荐)<br>
+        <label><input type="radio" name="captcha" value="4" '.(option::get('captcha') == 4 ? ' checked' : '').'> 极难</label> (难以辨识)
+		</td></tr>';
+		$content1['captcha'] = array('html'=>$captchahtml,'type'=>'else');
+	} else {
+		$content1['captcha'] = array('html'=>'<input type="number" name="captcha" value="0" hidden>','type'=>'else');
+	}
 	$content1['icp'] = array('td1'=>'<b>ICP 备案信息</b><br/>没有请留空','type'=>'text','text'=>'','extra'=>'');
-	$content1['trigger'] = array('td1'=>'<b>依靠访客触发任务</b>','type'=>'checkbox','text'=>'建议在不支持计划任务并拒绝加入云平台时使用，开启计划任务密码后无效','extra'=>'');
 	$content1['cktime'] = array('td1'=>'<b>Cookie有效期</b><br/>单位为秒，过大会导致浏览器无法记录','type'=>'number','text'=>'','extra'=>'step="1" min="1"');
-	$content1['isapp'] = array('td1'=>'<b>环境为引擎</b>','type'=>'checkbox','text'=>'如果您的主机不支持写入或者为应用引擎，请选择此项','extra'=>'');
 	$content1['dev'] = array('td1'=>'<b>开发者模式</b>','type'=>'checkbox','text'=>'生产环境下请勿开启','extra'=>'');
 		/*警告：超长内容*/
 	//内容较长时用缓冲区更方便
@@ -204,5 +218,20 @@ if (isset($i['mode'][2]) && $i['mode'][2] == 'sign') {
 	echo former::create($set1,$content1);
 }
 ?>
-
-<br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="http://zhizhe8.net" target="_blank">Kenvix</a> @ <a href="http://www.stus8.com" target="_blank">StusGame GROUP</a> &amp; <a href="http://www.longtings.com/" target="_blank">mokeyjay</a> &amp; <a href="http://fyy.l19l.com/" target="_blank">FYY</a>
+<?php if(function_exists('imagecreatetruecolor')): ?>
+<script>
+    $(function(){
+        $("input[name='captcha'][value!='0']").on('click', function(){
+			$("#captcha").attr('src', 'index.php?mod=captcha&level='+$("input[name='captcha']:checked").val());
+			$("#captcha").fadeIn();
+		});
+		$("input[name='captcha'][value='0']").on('click', function(){
+			$("#captcha").fadeOut();
+		});
+        $("#captcha").on('click', function(){
+            $("#captcha").attr('src', 'index.php?mod=captcha&level='+$("input[name='captcha']:checked").val());
+        });
+	});
+</script>
+<?php endif; ?>
+<br/><br/><?php echo SYSTEM_FN ?> V<?php echo SYSTEM_VER  . ' ' . SYSTEM_VER_NOTE ?> // 作者: <a href="https://kenvix.com" target="_blank">Kenvix</a>  &amp; <a href="http://www.mokeyjay.com/" target="_blank">mokeyjay</a> &amp;  <a href="http://fyy1999.lofter.com/" target="_blank">FYY</a> &amp; <a href="http://www.stusgame.com/" target="_blank">StusGame</a>

@@ -3,7 +3,7 @@
  * StusGame Framework 部分函数库
  * @author Kenvix
  */
-if (!defined('SYSTEM_ROOT')) { die('Insufficient Permissions'); } 
+if (!defined('SYSTEM_ROOT')) { die('Insufficient Permissions'); }
 /**
  * 获取用户ip地址
  */
@@ -81,21 +81,33 @@ function textMiddle($text, $left, $right) {
  * @return string|bool 百度用户名，失败返回FALSE
  */
 function getBaiduId($bduss){
-	global $m;
-	$header[] = 'Content-Type:application/x-www-form-urlencoded; charset=UTF-8';
-	$header[] = 'Cookie: BDUSS='.$bduss;
-	$c = new wcurl('http://wapp.baidu.com/',$header);
+	$c = new wcurl('http://wapp.baidu.com/');
+    $c->addCookie(array('BDUSS' => $bduss,'BAIDUID' => strtoupper(md5(time()))));
 	$data = $c->get();
 	$c->close();
 	return urldecode(textMiddle($data,'i?un=','">'));
 }
 
 /**
- * 获取Gravatar头像（或贴吧头像）
+ * 获取指定邮箱的的Gravatar头像
  * http://en.gravatar.com/site/implement/images/
  * @return bool|string
  */
-function getGravatar($s = 140, $d = 'mm', $g = 'g', $site = 'secure') {
+function gravatar($email, $s = 140, $d = 'mm', $g = 'g', $site = 'moefont') {
+	$hash = md5($email);
+	if($site == 'moefont') {
+		return "https://gravatar.moefont.com/avatar/$hash?s=$s&r=$g";
+	} else {
+		return "//{$site}.gravatar.com/avatar/$hash?s=$s&r=$g";
+	}
+}
+
+/**
+ * 获取当前用户的Gravatar头像或贴吧头像
+ * http://en.gravatar.com/site/implement/images/
+ * @return bool|string
+ */
+function getGravatar($s = 140, $d = 'mm', $g = 'g', $site = 'moefont') {
 	if(option::uget('face_img') == 1) {
 		if(option::uget('face_url') != ''){
 			return option::uget('face_url');
@@ -103,9 +115,7 @@ function getGravatar($s = 140, $d = 'mm', $g = 'g', $site = 'secure') {
 			return 'http://tb.himg.baidu.com/sys/portrait/item/';
 		}
 	} else {
-		$hash = md5(EMAIL);
-		$avatar = "https://{$site}.gravatar.com/avatar/$hash?s=$s&r=$g";
-		return $avatar;
+		return gravatar(EMAIL, $s, $d, $g, $site);
 	}
 }
 
@@ -169,7 +179,7 @@ function rand_array($a) {
  */
 function rand_int($l) {
 	$int = null;
-	for ($e=0; $e < $l; $e++) { 
+	for ($e=0; $e < $l; $e++) {
 		$int .= mt_rand(0,9);
 	}
 	return $int;
@@ -206,20 +216,36 @@ function getfreetable() {
  */
 function CleanUser($id) {
 	global $m;
-	$x=$m->once_fetch_array("SELECT * FROM  `".DB_NAME."`.`".DB_PREFIX."users` WHERE  `id` = {$id} LIMIT 1");
+	$x=$m->once_fetch_array("SELECT `t` FROM  `".DB_NAME."`.`".DB_PREFIX."users` WHERE  `id` = {$id} LIMIT 1");
 	$m->query('DELETE FROM `'.DB_NAME.'`.`'.DB_PREFIX.$x['t'].'` WHERE `'.DB_PREFIX.$x['t'].'`.`uid` = '.$id);
 }
 
 /**
  * 删除用户
  * 为节省数据库，捆绑清除贴吧数据
- * 
+ *
  * @param 用户ID
  */
 function DeleteUser($id) {
 	global $m;
 	CleanUser($id);
+    option::udel($id);
 	$m->query('DELETE FROM `'.DB_NAME.'`.`'.DB_PREFIX.'users` WHERE `'.DB_PREFIX.'users`.`id` = '.$id);
+}
+
+/**
+ * 判断`操作后`剩余的admin数量，如为0则报错
+ * `操作`通常指 删除 或 调整用户组
+ * 也就是判断`操作` $id_list 后剩余的admin数量
+ * @param array $id_list
+ */
+function MustAdminWarning($id_list)
+{
+    global $m;
+    $id_list = implode(',', $id_list); // 收集欲处理的用户id
+    $q = "SELECT COUNT(*) as num FROM `".DB_NAME."`.`".DB_PREFIX."users` WHERE `role` = 'admin' AND `id` NOT IN ({$id_list})";
+    $q = $m->once_fetch_array($q);
+    if($q['num'] == 0) msg('必须保留至少一位管理员！');
 }
 
 
@@ -249,7 +275,7 @@ function CreateZip($orig_fname, $content, $tempzip) {
  * 删除文件或目录
  */
 function DeleteFile($file) {
-	if (!file_exists($file)) 
+	if (!file_exists($file))
 		return false;
 	if (empty($file))
 		return false;
@@ -283,13 +309,13 @@ function CopyAll($source,$destination){
     if(!is_dir($source)) {
         return '错误：'.$source.'并不是一个目录';
     }
-  
+
     if(!is_dir($destination)) {
         mkdir($destination,0777,true);
     }
 
     $handle = dir($source);
-  
+
     while($entry=$handle->read()) {
         if(($entry!=='.')&&($entry!=='..')) {
             if(is_dir($source.'/'.$entry)) {
@@ -421,7 +447,7 @@ function sendRequest($url , $post = '' , $cookie = '') {
 
 /**
  * fosckopen 改进版
- */ 
+ */
 
 function XFSockOpen($url, $limit = 0, $post = '', $cookie = '', $bysocket = FALSE, $ip = '', $timeout = 15, $block = false) {
 	if (function_exists('fsockopen')) {
@@ -503,6 +529,8 @@ function addAction($hook, $actionFunc) {
 	$i['plugins']['hook'][$hook][] = $actionFunc;
 	return true;
 }
+
+
 
 /**
  * 执行挂在钩子上的函数,支持多参数 eg:doAction('post_comment', $author, $email, $url, $comment);
@@ -586,13 +614,16 @@ function getrole($role) {
 
 function redirect($url) {
 	Clean();
+	if(SYSTEM_ISCONSOLE) {
+		msg('控制台模式下，请手动打开此地址：' . PHP_EOL . $url);
+	}
 	header("Location: ".$url);
 	msg('<meta http-equiv="refresh" content="0; url='.htmlspecialchars($url).'" />请稍候......<br/><br/>如果您的浏览器没有自动跳转，请点击下面的链接',htmlspecialchars($url));
 }
 
 /**
  * 执行一个计划任务
- * 
+ *
  * @param 计划任务文件
  * @param 计划任务名称
  * @return bool 执行成功true，否则false
@@ -759,182 +790,198 @@ function get_extname($name) {
 function get_mime($ext) {
 	static $mime_types = array(
         'apk'     => 'application/vnd.android.package-archive',
-        '3gp'     => 'video/3gpp', 
-        'ai'      => 'application/postscript', 
-        'aif'     => 'audio/x-aiff', 
-        'aifc'    => 'audio/x-aiff', 
-        'aiff'    => 'audio/x-aiff', 
-        'asc'     => 'text/plain', 
-        'atom'    => 'application/atom+xml', 
-        'au'      => 'audio/basic', 
-        'avi'     => 'video/x-msvideo', 
-        'bcpio'   => 'application/x-bcpio', 
-        'bin'     => 'application/octet-stream', 
-        'bmp'     => 'image/bmp', 
-        'cdf'     => 'application/x-netcdf', 
-        'cgm'     => 'image/cgm', 
-        'class'   => 'application/octet-stream', 
-        'cpio'    => 'application/x-cpio', 
-        'cpt'     => 'application/mac-compactpro', 
-        'csh'     => 'application/x-csh', 
-        'css'     => 'text/css', 
-        'dcr'     => 'application/x-director', 
-        'dif'     => 'video/x-dv', 
-        'dir'     => 'application/x-director', 
-        'djv'     => 'image/vnd.djvu', 
-        'djvu'    => 'image/vnd.djvu', 
-        'dll'     => 'application/octet-stream', 
-        'dmg'     => 'application/octet-stream', 
-        'dms'     => 'application/octet-stream', 
-        'doc'     => 'application/msword', 
-        'dtd'     => 'application/xml-dtd', 
-        'dv'      => 'video/x-dv', 
-        'dvi'     => 'application/x-dvi', 
-        'dxr'     => 'application/x-director', 
-        'eps'     => 'application/postscript', 
-        'etx'     => 'text/x-setext', 
-        'exe'     => 'application/octet-stream', 
-        'ez'      => 'application/andrew-inset', 
-        'flv'     => 'video/x-flv', 
-        'gif'     => 'image/gif', 
-        'gram'    => 'application/srgs', 
-        'grxml'   => 'application/srgs+xml', 
-        'gtar'    => 'application/x-gtar', 
-        'gz'      => 'application/x-gzip', 
-        'hdf'     => 'application/x-hdf', 
-        'hqx'     => 'application/mac-binhex40', 
-        'htm'     => 'text/html', 
-        'html'    => 'text/html', 
-        'ice'     => 'x-conference/x-cooltalk', 
-        'ico'     => 'image/x-icon', 
-        'ics'     => 'text/calendar', 
-        'ief'     => 'image/ief', 
-        'ifb'     => 'text/calendar', 
-        'iges'    => 'model/iges', 
-        'igs'     => 'model/iges', 
-        'jnlp'    => 'application/x-java-jnlp-file', 
-        'jp2'     => 'image/jp2', 
-        'jpe'     => 'image/jpeg', 
-        'jpeg'    => 'image/jpeg', 
-        'jpg'     => 'image/jpeg', 
-        'js'      => 'application/x-javascript', 
-        'kar'     => 'audio/midi', 
-        'latex'   => 'application/x-latex', 
-        'lha'     => 'application/octet-stream', 
-        'lzh'     => 'application/octet-stream', 
-        'm3u'     => 'audio/x-mpegurl', 
-        'm4a'     => 'audio/mp4a-latm', 
-        'm4p'     => 'audio/mp4a-latm', 
-        'm4u'     => 'video/vnd.mpegurl', 
-        'm4v'     => 'video/x-m4v', 
-        'mac'     => 'image/x-macpaint', 
-        'man'     => 'application/x-troff-man', 
-        'mathml'  => 'application/mathml+xml', 
-        'me'      => 'application/x-troff-me', 
-        'mesh'    => 'model/mesh', 
-        'mid'     => 'audio/midi', 
-        'midi'    => 'audio/midi', 
-        'mif'     => 'application/vnd.mif', 
-        'mov'     => 'video/quicktime', 
-        'movie'   => 'video/x-sgi-movie', 
-        'mp2'     => 'audio/mpeg', 
-        'mp3'     => 'audio/mpeg', 
-        'mp4'     => 'video/mp4', 
-        'mpe'     => 'video/mpeg', 
-        'mpeg'    => 'video/mpeg', 
-        'mpg'     => 'video/mpeg', 
-        'mpga'    => 'audio/mpeg', 
-        'ms'      => 'application/x-troff-ms', 
-        'msh'     => 'model/mesh', 
-        'mxu'     => 'video/vnd.mpegurl', 
-        'nc'      => 'application/x-netcdf', 
-        'oda'     => 'application/oda', 
-        'ogg'     => 'application/ogg', 
-        'ogv'     => 'video/ogv', 
-        'pbm'     => 'image/x-portable-bitmap', 
-        'pct'     => 'image/pict', 
-        'pdb'     => 'chemical/x-pdb', 
-        'pdf'     => 'application/pdf', 
-        'pgm'     => 'image/x-portable-graymap', 
-        'pgn'     => 'application/x-chess-pgn', 
-        'pic'     => 'image/pict', 
-        'pict'    => 'image/pict', 
-        'png'     => 'image/png', 
-        'pnm'     => 'image/x-portable-anymap', 
-        'pnt'     => 'image/x-macpaint', 
-        'pntg'    => 'image/x-macpaint', 
-        'ppm'     => 'image/x-portable-pixmap', 
-        'ppt'     => 'application/vnd.ms-powerpoint', 
-        'ps'      => 'application/postscript', 
-        'qt'      => 'video/quicktime', 
-        'qti'     => 'image/x-quicktime', 
-        'qtif'    => 'image/x-quicktime', 
-        'ra'      => 'audio/x-pn-realaudio', 
-        'ram'     => 'audio/x-pn-realaudio', 
-        'ras'     => 'image/x-cmu-raster', 
-        'rdf'     => 'application/rdf+xml', 
-        'rgb'     => 'image/x-rgb', 
-        'rm'      => 'application/vnd.rn-realmedia', 
-        'roff'    => 'application/x-troff', 
-        'rtf'     => 'text/rtf', 
-        'rtx'     => 'text/richtext', 
-        'sgm'     => 'text/sgml', 
-        'sgml'    => 'text/sgml', 
-        'sh'      => 'application/x-sh', 
-        'shar'    => 'application/x-shar', 
-        'silo'    => 'model/mesh', 
-        'sit'     => 'application/x-stuffit', 
-        'skd'     => 'application/x-koan', 
-        'skm'     => 'application/x-koan', 
-        'skp'     => 'application/x-koan', 
-        'skt'     => 'application/x-koan', 
-        'smi'     => 'application/smil', 
-        'smil'    => 'application/smil', 
-        'snd'     => 'audio/basic', 
-        'so'      => 'application/octet-stream', 
-        'spl'     => 'application/x-futuresplash', 
-        'src'     => 'application/x-wais-source', 
-        'sv4cpio' => 'application/x-sv4cpio', 
-        'sv4crc'  => 'application/x-sv4crc', 
-        'svg'     => 'image/svg+xml', 
-        'swf'     => 'application/x-shockwave-flash', 
-        't'       => 'application/x-troff', 
-        'tar'     => 'application/x-tar', 
-        'tcl'     => 'application/x-tcl', 
-        'tex'     => 'application/x-tex', 
-        'texi'    => 'application/x-texinfo', 
-        'texinfo' => 'application/x-texinfo', 
-        'tif'     => 'image/tiff', 
-        'tiff'    => 'image/tiff', 
-        'tr'      => 'application/x-troff', 
-        'tsv'     => 'text/tab-separated-values', 
-        'txt'     => 'text/plain', 
-        'ustar'   => 'application/x-ustar', 
-        'vcd'     => 'application/x-cdlink', 
-        'vrml'    => 'model/vrml', 
-        'vxml'    => 'application/voicexml+xml', 
-        'wav'     => 'audio/x-wav', 
-        'wbmp'    => 'image/vnd.wap.wbmp', 
-        'wbxml'   => 'application/vnd.wap.wbxml', 
-        'webm'    => 'video/webm', 
-        'wml'     => 'text/vnd.wap.wml', 
-        'wmlc'    => 'application/vnd.wap.wmlc', 
-        'wmls'    => 'text/vnd.wap.wmlscript', 
-        'wmlsc'   => 'application/vnd.wap.wmlscriptc', 
-        'wmv'     => 'video/x-ms-wmv', 
-        'wrl'     => 'model/vrml', 
-        'xbm'     => 'image/x-xbitmap', 
-        'xht'     => 'application/xhtml+xml', 
-        'xhtml'   => 'application/xhtml+xml', 
-        'xls'     => 'application/vnd.ms-excel', 
-        'xml'     => 'application/xml', 
-        'xpm'     => 'image/x-xpixmap', 
-        'xsl'     => 'application/xml', 
-        'xslt'    => 'application/xslt+xml', 
-        'xul'     => 'application/vnd.mozilla.xul+xml', 
-        'xwd'     => 'image/x-xwindowdump', 
-        'xyz'     => 'chemical/x-xyz', 
-        'zip'     => 'application/zip' 
+        '3gp'     => 'video/3gpp',
+        'ai'      => 'application/postscript',
+        'aif'     => 'audio/x-aiff',
+        'aifc'    => 'audio/x-aiff',
+        'aiff'    => 'audio/x-aiff',
+        'asc'     => 'text/plain',
+        'atom'    => 'application/atom+xml',
+        'au'      => 'audio/basic',
+        'avi'     => 'video/x-msvideo',
+        'bcpio'   => 'application/x-bcpio',
+        'bin'     => 'application/octet-stream',
+        'bmp'     => 'image/bmp',
+        'cdf'     => 'application/x-netcdf',
+        'cgm'     => 'image/cgm',
+        'class'   => 'application/octet-stream',
+        'cpio'    => 'application/x-cpio',
+        'cpt'     => 'application/mac-compactpro',
+        'csh'     => 'application/x-csh',
+        'css'     => 'text/css',
+        'dcr'     => 'application/x-director',
+        'dif'     => 'video/x-dv',
+        'dir'     => 'application/x-director',
+        'djv'     => 'image/vnd.djvu',
+        'djvu'    => 'image/vnd.djvu',
+        'dll'     => 'application/octet-stream',
+        'dmg'     => 'application/octet-stream',
+        'dms'     => 'application/octet-stream',
+        'doc'     => 'application/msword',
+        'dtd'     => 'application/xml-dtd',
+        'dv'      => 'video/x-dv',
+        'dvi'     => 'application/x-dvi',
+        'dxr'     => 'application/x-director',
+        'eps'     => 'application/postscript',
+        'etx'     => 'text/x-setext',
+        'exe'     => 'application/octet-stream',
+        'ez'      => 'application/andrew-inset',
+        'flv'     => 'video/x-flv',
+        'gif'     => 'image/gif',
+        'gram'    => 'application/srgs',
+        'grxml'   => 'application/srgs+xml',
+        'gtar'    => 'application/x-gtar',
+        'gz'      => 'application/x-gzip',
+        'hdf'     => 'application/x-hdf',
+        'hqx'     => 'application/mac-binhex40',
+        'htm'     => 'text/html',
+        'html'    => 'text/html',
+        'ice'     => 'x-conference/x-cooltalk',
+        'ico'     => 'image/x-icon',
+        'ics'     => 'text/calendar',
+        'ief'     => 'image/ief',
+        'ifb'     => 'text/calendar',
+        'iges'    => 'model/iges',
+        'igs'     => 'model/iges',
+        'jnlp'    => 'application/x-java-jnlp-file',
+        'jp2'     => 'image/jp2',
+        'jpe'     => 'image/jpeg',
+        'jpeg'    => 'image/jpeg',
+        'jpg'     => 'image/jpeg',
+        'js'      => 'application/x-javascript',
+        'kar'     => 'audio/midi',
+        'latex'   => 'application/x-latex',
+        'lha'     => 'application/octet-stream',
+        'lzh'     => 'application/octet-stream',
+        'm3u'     => 'audio/x-mpegurl',
+        'm4a'     => 'audio/mp4a-latm',
+        'm4p'     => 'audio/mp4a-latm',
+        'm4u'     => 'video/vnd.mpegurl',
+        'm4v'     => 'video/x-m4v',
+        'mac'     => 'image/x-macpaint',
+        'man'     => 'application/x-troff-man',
+        'mathml'  => 'application/mathml+xml',
+        'me'      => 'application/x-troff-me',
+        'mesh'    => 'model/mesh',
+        'mid'     => 'audio/midi',
+        'midi'    => 'audio/midi',
+        'mif'     => 'application/vnd.mif',
+        'mov'     => 'video/quicktime',
+        'movie'   => 'video/x-sgi-movie',
+        'mp2'     => 'audio/mpeg',
+        'mp3'     => 'audio/mpeg',
+        'mp4'     => 'video/mp4',
+        'mpe'     => 'video/mpeg',
+        'mpeg'    => 'video/mpeg',
+        'mpg'     => 'video/mpeg',
+        'mpga'    => 'audio/mpeg',
+        'ms'      => 'application/x-troff-ms',
+        'msh'     => 'model/mesh',
+        'mxu'     => 'video/vnd.mpegurl',
+        'nc'      => 'application/x-netcdf',
+        'oda'     => 'application/oda',
+        'ogg'     => 'application/ogg',
+        'ogv'     => 'video/ogv',
+        'pbm'     => 'image/x-portable-bitmap',
+        'pct'     => 'image/pict',
+        'pdb'     => 'chemical/x-pdb',
+        'pdf'     => 'application/pdf',
+        'pgm'     => 'image/x-portable-graymap',
+        'pgn'     => 'application/x-chess-pgn',
+        'pic'     => 'image/pict',
+        'pict'    => 'image/pict',
+        'png'     => 'image/png',
+        'pnm'     => 'image/x-portable-anymap',
+        'pnt'     => 'image/x-macpaint',
+        'pntg'    => 'image/x-macpaint',
+        'ppm'     => 'image/x-portable-pixmap',
+        'ppt'     => 'application/vnd.ms-powerpoint',
+        'ps'      => 'application/postscript',
+        'qt'      => 'video/quicktime',
+        'qti'     => 'image/x-quicktime',
+        'qtif'    => 'image/x-quicktime',
+        'ra'      => 'audio/x-pn-realaudio',
+        'ram'     => 'audio/x-pn-realaudio',
+        'ras'     => 'image/x-cmu-raster',
+        'rdf'     => 'application/rdf+xml',
+        'rgb'     => 'image/x-rgb',
+        'rm'      => 'application/vnd.rn-realmedia',
+        'roff'    => 'application/x-troff',
+        'rtf'     => 'text/rtf',
+        'rtx'     => 'text/richtext',
+        'sgm'     => 'text/sgml',
+        'sgml'    => 'text/sgml',
+        'sh'      => 'application/x-sh',
+        'shar'    => 'application/x-shar',
+        'silo'    => 'model/mesh',
+        'sit'     => 'application/x-stuffit',
+        'skd'     => 'application/x-koan',
+        'skm'     => 'application/x-koan',
+        'skp'     => 'application/x-koan',
+        'skt'     => 'application/x-koan',
+        'smi'     => 'application/smil',
+        'smil'    => 'application/smil',
+        'snd'     => 'audio/basic',
+        'so'      => 'application/octet-stream',
+        'spl'     => 'application/x-futuresplash',
+        'src'     => 'application/x-wais-source',
+        'sv4cpio' => 'application/x-sv4cpio',
+        'sv4crc'  => 'application/x-sv4crc',
+        'svg'     => 'image/svg+xml',
+        'swf'     => 'application/x-shockwave-flash',
+        't'       => 'application/x-troff',
+        'tar'     => 'application/x-tar',
+        'tcl'     => 'application/x-tcl',
+        'tex'     => 'application/x-tex',
+        'texi'    => 'application/x-texinfo',
+        'texinfo' => 'application/x-texinfo',
+        'tif'     => 'image/tiff',
+        'tiff'    => 'image/tiff',
+        'tr'      => 'application/x-troff',
+        'tsv'     => 'text/tab-separated-values',
+        'txt'     => 'text/plain',
+        'ustar'   => 'application/x-ustar',
+        'vcd'     => 'application/x-cdlink',
+        'vrml'    => 'model/vrml',
+        'vxml'    => 'application/voicexml+xml',
+        'wav'     => 'audio/x-wav',
+        'wbmp'    => 'image/vnd.wap.wbmp',
+        'wbxml'   => 'application/vnd.wap.wbxml',
+        'webm'    => 'video/webm',
+        'wml'     => 'text/vnd.wap.wml',
+        'wmlc'    => 'application/vnd.wap.wmlc',
+        'wmls'    => 'text/vnd.wap.wmlscript',
+        'wmlsc'   => 'application/vnd.wap.wmlscriptc',
+        'wmv'     => 'video/x-ms-wmv',
+        'wrl'     => 'model/vrml',
+        'xbm'     => 'image/x-xbitmap',
+        'xht'     => 'application/xhtml+xml',
+        'xhtml'   => 'application/xhtml+xml',
+        'xls'     => 'application/vnd.ms-excel',
+        'xml'     => 'application/xml',
+        'xpm'     => 'image/x-xpixmap',
+        'xsl'     => 'application/xml',
+        'xslt'    => 'application/xslt+xml',
+        'xul'     => 'application/vnd.mozilla.xul+xml',
+        'xwd'     => 'image/x-xwindowdump',
+        'xyz'     => 'chemical/x-xyz',
+        'zip'     => 'application/zip'
     );
     return isset($mime_types[$ext]) ? $mime_types[$ext] : 'application/octet-stream';
+}
+
+
+/**
+ * 防CSRF验证
+ * @param bool $strict 严格模式。拒绝空referer
+ */
+function csrf($strict = true) {
+	if(defined('ANTI_CSRF') && !ANTI_CSRF) return;
+	global $i;
+	if(empty($i['opt']['csrf'])) {
+		if(empty($_SERVER['HTTP_REFERER']) && $strict) redirect('index.php');
+		$p = parse_url($_SERVER['HTTP_REFERER']);
+		if(!$p || empty($p['host'])) msg('CSRF防御：无效请求。<a href="https://git.oschina.net/kenvix/Tieba-Cloud-Sign/wikis/%E5%85%B3%E4%BA%8E%E4%BA%91%E7%AD%BE%E5%88%B0CSRF%E9%98%B2%E5%BE%A1" target="_blank">了解更多关于CSRF防御...</a>');
+		if($p['host'] != $_SERVER['SERVER_NAME']) msg('CSRF防御：错误的请求来源<a href="https://git.oschina.net/kenvix/Tieba-Cloud-Sign/wikis/%E5%85%B3%E4%BA%8E%E4%BA%91%E7%AD%BE%E5%88%B0CSRF%E9%98%B2%E5%BE%A1" target="_blank">了解更多关于CSRF防御...</a>');
+	}
 }

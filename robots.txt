@@ -8,4 +8,5 @@ Disallow: /license.html
 Disallow: /README.md
 Disallow: /lib/
 Disallow: /setup/
+Disallow: /source/
 Disallow: /templates/
